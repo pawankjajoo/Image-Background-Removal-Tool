@@ -1,0 +1,774 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Background Remover — 100% Client-Side</title>
+<style>
+  :root {
+    --bg: #0f0f13;
+    --surface: #1a1a24;
+    --surface2: #24243a;
+    --accent: #7c5cfc;
+    --accent-hover: #9b7fff;
+    --text: #e8e8f0;
+    --text-dim: #8888a8;
+    --border: #2a2a40;
+    --success: #34d399;
+    --danger: #f87171;
+    --radius: 14px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .header {
+    text-align: center;
+    padding: 40px 20px 10px;
+    max-width: 640px;
+  }
+  .header h1 {
+    font-size: 2rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, #7c5cfc 0%, #c084fc 50%, #f472b6 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 8px;
+  }
+  .header p { color: var(--text-dim); font-size: 0.95rem; line-height: 1.5; }
+
+  .badges {
+    display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 14px;
+  }
+  .badge {
+    font-size: 0.72rem;
+    padding: 4px 10px;
+    border-radius: 20px;
+    background: var(--surface2);
+    color: var(--text-dim);
+    border: 1px solid var(--border);
+  }
+  .badge.green { border-color: #34d39955; color: var(--success); }
+
+  .container {
+    width: 100%;
+    max-width: 960px;
+    padding: 20px;
+  }
+
+  /* ── Settings Panel ── */
+  .settings-bar {
+    display: flex; gap: 12px; flex-wrap: wrap; align-items: center;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 18px;
+    margin-bottom: 16px;
+  }
+  .setting-group { display: flex; align-items: center; gap: 6px; }
+  .setting-group label { font-size: 0.78rem; color: var(--text-dim); white-space: nowrap; }
+  .setting-group select, .setting-group input[type=range] {
+    background: var(--surface2);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 5px 8px;
+    font-size: 0.78rem;
+    outline: none;
+  }
+  .setting-group select:focus { border-color: var(--accent); }
+  .setting-group input[type=range] { width: 80px; accent-color: var(--accent); }
+  .val-display { font-size: 0.72rem; color: var(--accent); min-width: 28px; }
+
+  /* ── Drop Zone ── */
+  .dropzone {
+    border: 2px dashed var(--border);
+    border-radius: var(--radius);
+    padding: 60px 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.25s;
+    background: var(--surface);
+    position: relative;
+  }
+  .dropzone:hover, .dropzone.dragover {
+    border-color: var(--accent);
+    background: #1a1a30;
+  }
+  .dropzone-icon { font-size: 3rem; margin-bottom: 12px; opacity: 0.6; }
+  .dropzone h3 { font-size: 1.05rem; margin-bottom: 6px; }
+  .dropzone p { color: var(--text-dim); font-size: 0.82rem; }
+  .dropzone input { display: none; }
+
+  .file-info {
+    margin-top: 10px;
+    font-size: 0.78rem;
+    color: var(--accent);
+    display: none;
+  }
+
+  /* ── Action Button ── */
+  .actions {
+    display: flex; gap: 10px; justify-content: center; margin: 18px 0;
+    flex-wrap: wrap;
+  }
+  .btn {
+    padding: 12px 28px;
+    border-radius: 10px;
+    border: none;
+    font-size: 0.88rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .btn-primary {
+    background: linear-gradient(135deg, var(--accent), #9b7fff);
+    color: #fff;
+  }
+  .btn-primary:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 6px 24px #7c5cfc44; }
+  .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-secondary {
+    background: var(--surface2);
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+  .btn-secondary:hover { border-color: var(--accent); }
+  .btn-danger { background: #f8717122; color: var(--danger); border: 1px solid #f8717133; }
+  .btn-danger:hover { background: #f8717133; }
+
+  /* ── Progress ── */
+  .progress-area {
+    display: none;
+    margin: 16px 0;
+  }
+  .progress-bar-wrap {
+    height: 6px;
+    background: var(--surface2);
+    border-radius: 10px;
+    overflow: hidden;
+    margin-bottom: 10px;
+  }
+  .progress-bar-fill {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, var(--accent), #c084fc);
+    border-radius: 10px;
+    transition: width 0.3s;
+  }
+  .progress-text {
+    font-size: 0.78rem;
+    color: var(--text-dim);
+    text-align: center;
+  }
+
+  /* ── Preview Grid ── */
+  .preview-grid {
+    display: none;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-top: 16px;
+  }
+  @media (max-width: 640px) { .preview-grid { grid-template-columns: 1fr; } }
+
+  .preview-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .preview-card-header {
+    padding: 10px 16px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--text-dim);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .preview-card-header .size-info { font-weight: 400; color: var(--text-dim); font-size: 0.72rem; }
+
+  .preview-img-wrap {
+    position: relative;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 220px;
+    padding: 12px;
+  }
+
+  /* Checkerboard for transparent preview */
+  .checkerboard {
+    background-image:
+      linear-gradient(45deg, #2a2a40 25%, transparent 25%),
+      linear-gradient(-45deg, #2a2a40 25%, transparent 25%),
+      linear-gradient(45deg, transparent 75%, #2a2a40 75%),
+      linear-gradient(-45deg, transparent 75%, #2a2a40 75%);
+    background-size: 16px 16px;
+    background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+  }
+
+  .preview-img-wrap img {
+    max-width: 100%;
+    max-height: 360px;
+    object-fit: contain;
+    border-radius: 6px;
+  }
+
+  /* ── Stats ── */
+  .stats {
+    display: none;
+    gap: 12px;
+    justify-content: center;
+    margin: 14px 0;
+    flex-wrap: wrap;
+  }
+  .stat {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 18px;
+    text-align: center;
+  }
+  .stat-val { font-size: 1.15rem; font-weight: 700; color: var(--accent); }
+  .stat-label { font-size: 0.68rem; color: var(--text-dim); margin-top: 2px; }
+
+  /* ── Color picker override bg ── */
+  .color-bg-options {
+    display: none;
+    gap: 8px;
+    align-items: center;
+    margin: 14px 0;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+  .color-swatch {
+    width: 30px; height: 30px;
+    border-radius: 50%;
+    border: 2px solid var(--border);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .color-swatch:hover, .color-swatch.active { border-color: var(--accent); transform: scale(1.15); }
+  .color-swatch.transparent-swatch {
+    background-image:
+      linear-gradient(45deg, #ccc 25%, transparent 25%),
+      linear-gradient(-45deg, #ccc 25%, transparent 25%),
+      linear-gradient(45deg, transparent 75%, #ccc 75%),
+      linear-gradient(-45deg, transparent 75%, #ccc 75%);
+    background-size: 8px 8px;
+    background-position: 0 0, 0 4px, 4px -4px, -4px 0;
+  }
+
+  /* ── Batch file list ── */
+  .batch-list {
+    display: none;
+    flex-direction: column;
+    gap: 6px;
+    margin: 10px 0;
+    max-height: 200px;
+    overflow-y: auto;
+    padding-right: 4px;
+  }
+  .batch-item {
+    display: flex; align-items: center; gap: 10px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 0.78rem;
+  }
+  .batch-item .fname { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .batch-item .fstatus { font-size: 0.72rem; color: var(--text-dim); }
+  .batch-item .fstatus.done { color: var(--success); }
+  .batch-item .fstatus.processing { color: var(--accent); }
+  .batch-item .fstatus.error { color: var(--danger); }
+
+  .hidden { display: none !important; }
+
+  /* ── Scrollbar ── */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: var(--surface); border-radius: 10px; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Background Remover</h1>
+  <p>AI-powered background removal running 100% in your browser. No uploads, no server costs, no API keys. Your images never leave your device.</p>
+  <div class="badges">
+    <span class="badge green">Zero Server Cost</span>
+    <span class="badge green">100% Private</span>
+    <span class="badge">WebGPU Accelerated</span>
+    <span class="badge">ONNX Neural Network</span>
+    <span class="badge">Batch Processing</span>
+  </div>
+</div>
+
+<div class="container">
+  <!-- Settings -->
+  <div class="settings-bar">
+    <div class="setting-group">
+      <label>Quality</label>
+      <select id="qualitySelect">
+        <option value="small">Fast (small model ~10MB)</option>
+        <option value="medium" selected>Balanced (medium ~40MB)</option>
+        <option value="full">High Quality (full ~176MB) ⚠️</option>
+      </select>
+    </div>
+    <div class="setting-group">
+      <label>Output</label>
+      <select id="outputFormat">
+        <option value="image/png" selected>PNG (transparent)</option>
+        <option value="image/webp">WebP (smaller)</option>
+      </select>
+    </div>
+    <div class="setting-group">
+      <label>Max Size</label>
+      <select id="maxSize">
+        <option value="1024">1024px (fast)</option>
+        <option value="2048" selected>2048px (balanced)</option>
+        <option value="4096">4096px (slow)</option>
+        <option value="0">Original</option>
+      </select>
+    </div>
+    <div class="setting-group">
+      <label>Edge Refine</label>
+      <input type="range" id="featherSlider" min="0" max="10" value="1" step="1">
+      <span class="val-display" id="featherVal">1px</span>
+    </div>
+  </div>
+
+  <!-- Drop Zone -->
+  <div class="dropzone" id="dropzone">
+    <div class="dropzone-icon">🖼️</div>
+    <h3>Drop image(s) here or click to browse</h3>
+    <p>Supports PNG, JPG, WebP, BMP — up to 20 MB per image. Batch supported.</p>
+    <input type="file" id="fileInput" accept="image/*" multiple>
+    <div class="file-info" id="fileInfo"></div>
+  </div>
+
+  <!-- Batch List -->
+  <div class="batch-list" id="batchList"></div>
+
+  <!-- Actions -->
+  <div class="actions">
+    <button class="btn btn-primary" id="processBtn" disabled>
+      <span id="processBtnText">✨ Remove Background</span>
+    </button>
+    <button class="btn btn-secondary hidden" id="downloadBtn">⬇ Download PNG</button>
+    <button class="btn btn-secondary hidden" id="downloadAllBtn">⬇ Download All</button>
+    <button class="btn btn-danger hidden" id="resetBtn">✕ Clear</button>
+  </div>
+
+  <!-- Progress -->
+  <div class="progress-area" id="progressArea">
+    <div class="progress-bar-wrap">
+      <div class="progress-bar-fill" id="progressFill"></div>
+    </div>
+    <div class="progress-text" id="progressText">Initializing AI model…</div>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats" id="stats">
+    <div class="stat"><div class="stat-val" id="statTime">—</div><div class="stat-label">Processing Time</div></div>
+    <div class="stat"><div class="stat-val" id="statOrigSize">—</div><div class="stat-label">Original Size</div></div>
+    <div class="stat"><div class="stat-val" id="statNewSize">—</div><div class="stat-label">Output Size</div></div>
+    <div class="stat"><div class="stat-val" id="statDims">—</div><div class="stat-label">Dimensions</div></div>
+  </div>
+
+  <!-- Background color swatches -->
+  <div class="color-bg-options" id="colorOptions">
+    <span style="font-size:0.78rem;color:var(--text-dim);">Preview bg:</span>
+    <div class="color-swatch transparent-swatch active" data-color="transparent" title="Transparent"></div>
+    <div class="color-swatch" style="background:#fff" data-color="#ffffff" title="White"></div>
+    <div class="color-swatch" style="background:#000" data-color="#000000" title="Black"></div>
+    <div class="color-swatch" style="background:#3b82f6" data-color="#3b82f6" title="Blue"></div>
+    <div class="color-swatch" style="background:#22c55e" data-color="#22c55e" title="Green"></div>
+    <div class="color-swatch" style="background:#f43f5e" data-color="#f43f5e" title="Red"></div>
+  </div>
+
+  <!-- Preview Grid -->
+  <div class="preview-grid" id="previewGrid">
+    <div class="preview-card">
+      <div class="preview-card-header">Original <span class="size-info" id="origInfo"></span></div>
+      <div class="preview-img-wrap"><img id="origImg"></div>
+    </div>
+    <div class="preview-card">
+      <div class="preview-card-header">Background Removed <span class="size-info" id="resultInfo"></span></div>
+      <div class="preview-img-wrap checkerboard" id="resultWrap"><img id="resultImg"></div>
+    </div>
+  </div>
+</div>
+
+<!-- IMG.LY Background Removal via CDN -->
+<script type="module">
+import imglyRemoveBackground from 'https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.5.5/+esm';
+
+const $ = s => document.querySelector(s);
+const $$ = s => document.querySelectorAll(s);
+
+// Elements
+const dropzone = $('#dropzone');
+const fileInput = $('#fileInput');
+const fileInfo = $('#fileInfo');
+const processBtn = $('#processBtn');
+const processBtnText = $('#processBtnText');
+const downloadBtn = $('#downloadBtn');
+const downloadAllBtn = $('#downloadAllBtn');
+const resetBtn = $('#resetBtn');
+const progressArea = $('#progressArea');
+const progressFill = $('#progressFill');
+const progressText = $('#progressText');
+const previewGrid = $('#previewGrid');
+const origImg = $('#origImg');
+const resultImg = $('#resultImg');
+const stats = $('#stats');
+const batchList = $('#batchList');
+const colorOptions = $('#colorOptions');
+const resultWrap = $('#resultWrap');
+
+let selectedFiles = [];
+let resultBlobs = [];
+let currentResultBlob = null;
+
+// ── Drop Zone ──
+dropzone.addEventListener('click', () => fileInput.click());
+dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('dragover'); });
+dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dragover'));
+dropzone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropzone.classList.remove('dragover');
+  handleFiles(e.dataTransfer.files);
+});
+fileInput.addEventListener('change', () => handleFiles(fileInput.files));
+
+function handleFiles(files) {
+  selectedFiles = [...files].filter(f => f.type.startsWith('image/'));
+  if (!selectedFiles.length) return;
+
+  if (selectedFiles.length === 1) {
+    fileInfo.textContent = `${selectedFiles[0].name} (${formatBytes(selectedFiles[0].size)})`;
+  } else {
+    fileInfo.textContent = `${selectedFiles.length} images selected`;
+  }
+  fileInfo.style.display = 'block';
+  processBtn.disabled = false;
+
+  // Show batch list if multiple
+  if (selectedFiles.length > 1) {
+    batchList.innerHTML = '';
+    batchList.style.display = 'flex';
+    selectedFiles.forEach(f => {
+      const item = document.createElement('div');
+      item.className = 'batch-item';
+      item.innerHTML = `<span class="fname">${f.name}</span><span class="fstatus" data-fname="${f.name}">Pending</span>`;
+      batchList.appendChild(item);
+    });
+  } else {
+    batchList.style.display = 'none';
+  }
+
+  // Preview original
+  const url = URL.createObjectURL(selectedFiles[0]);
+  origImg.src = url;
+  previewGrid.style.display = 'none';
+  hideResults();
+}
+
+// ── Process ──
+processBtn.addEventListener('click', async () => {
+  if (!selectedFiles.length) return;
+
+  processBtn.disabled = true;
+  processBtnText.textContent = '⏳ Processing…';
+  progressArea.style.display = 'block';
+  hideResults();
+  resultBlobs = [];
+
+  const quality = $('#qualitySelect').value;
+  const outputFormat = $('#outputFormat').value;
+  const maxSize = parseInt($('#maxSize').value);
+  const feather = parseInt($('#featherSlider').value);
+
+  const config = {
+    model: quality,
+    output: { format: 'image/png', quality: 0.9 },
+    progress: (key, current, total) => {
+      const pct = total > 0 ? Math.round((current / total) * 100) : 0;
+      progressFill.style.width = pct + '%';
+      const label = key.includes('fetch') ? 'Downloading AI model' :
+                    key.includes('compute') ? 'Processing image' : key;
+      progressText.textContent = `${label}… ${pct}%`;
+    }
+  };
+
+  const t0 = performance.now();
+
+  try {
+    for (let i = 0; i < selectedFiles.length; i++) {
+      const file = selectedFiles[i];
+
+      // Update batch status
+      const statusEl = batchList.querySelector(`[data-fname="${CSS.escape(file.name)}"]`);
+      if (statusEl) { statusEl.textContent = 'Processing…'; statusEl.className = 'fstatus processing'; }
+
+      // Optionally resize
+      let inputBlob = file;
+      if (maxSize > 0) {
+        inputBlob = await resizeIfNeeded(file, maxSize);
+      }
+
+      // Run removal
+      let blob = await imglyRemoveBackground(inputBlob, config);
+
+      // Edge refinement (feather)
+      if (feather > 0) {
+        blob = await applyFeather(blob, feather);
+      }
+
+      // Convert to desired format
+      if (outputFormat === 'image/webp') {
+        blob = await convertBlob(blob, 'image/webp', 0.92);
+      }
+
+      resultBlobs.push({ name: file.name, blob });
+
+      if (statusEl) { statusEl.textContent = 'Done ✓'; statusEl.className = 'fstatus done'; }
+    }
+
+    const elapsed = ((performance.now() - t0) / 1000).toFixed(1);
+
+    // Show last result (or first for single)
+    const primary = resultBlobs[0];
+    currentResultBlob = primary.blob;
+    const resultURL = URL.createObjectURL(primary.blob);
+    resultImg.src = resultURL;
+    origImg.src = URL.createObjectURL(selectedFiles[0]);
+
+    // Stats
+    $('#statTime').textContent = elapsed + 's';
+    $('#statOrigSize').textContent = formatBytes(selectedFiles[0].size);
+    $('#statNewSize').textContent = formatBytes(primary.blob.size);
+    const img = new Image();
+    img.onload = () => { $('#statDims').textContent = img.width + '×' + img.height; };
+    img.src = resultURL;
+
+    stats.style.display = 'flex';
+    previewGrid.style.display = 'grid';
+    colorOptions.style.display = 'flex';
+    downloadBtn.classList.remove('hidden');
+    resetBtn.classList.remove('hidden');
+    if (resultBlobs.length > 1) downloadAllBtn.classList.remove('hidden');
+
+    progressText.textContent = `Done! Processed ${resultBlobs.length} image(s) in ${elapsed}s`;
+    progressFill.style.width = '100%';
+
+  } catch (err) {
+    console.error(err);
+    progressText.textContent = '❌ Error: ' + err.message;
+    progressFill.style.width = '0%';
+
+    // Mark any remaining as error
+    batchList.querySelectorAll('.fstatus.processing').forEach(el => {
+      el.textContent = 'Error'; el.className = 'fstatus error';
+    });
+  }
+
+  processBtn.disabled = false;
+  processBtnText.textContent = '✨ Remove Background';
+});
+
+// ── Resize helper ──
+function resizeIfNeeded(file, maxDim) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      if (img.width <= maxDim && img.height <= maxDim) { resolve(file); return; }
+      const scale = maxDim / Math.max(img.width, img.height);
+      const c = document.createElement('canvas');
+      c.width = Math.round(img.width * scale);
+      c.height = Math.round(img.height * scale);
+      const ctx = c.getContext('2d');
+      ctx.drawImage(img, 0, 0, c.width, c.height);
+      c.toBlob(b => resolve(b), 'image/png');
+    };
+    img.src = URL.createObjectURL(file);
+  });
+}
+
+// ── Feather / edge refine ──
+function applyFeather(blob, radius) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const c = document.createElement('canvas');
+      c.width = img.width; c.height = img.height;
+      const ctx = c.getContext('2d');
+      ctx.drawImage(img, 0, 0);
+      const imageData = ctx.getImageData(0, 0, c.width, c.height);
+      const data = imageData.data;
+
+      // Simple gaussian-like alpha feathering on edges
+      const alpha = new Float32Array(c.width * c.height);
+      for (let i = 0; i < alpha.length; i++) alpha[i] = data[i * 4 + 3] / 255;
+
+      const blurred = boxBlurAlpha(alpha, c.width, c.height, radius);
+
+      for (let i = 0; i < alpha.length; i++) {
+        const orig = alpha[i];
+        // Only affect edge pixels (semi-transparent or near boundary)
+        if (orig > 0.02 && orig < 0.98) {
+          data[i * 4 + 3] = Math.round(blurred[i] * 255);
+        } else if (orig >= 0.98) {
+          // Check if near an edge
+          const x = i % c.width, y = Math.floor(i / c.width);
+          let nearEdge = false;
+          for (let dy = -radius; dy <= radius && !nearEdge; dy++) {
+            for (let dx = -radius; dx <= radius && !nearEdge; dx++) {
+              const nx = x + dx, ny = y + dy;
+              if (nx >= 0 && nx < c.width && ny >= 0 && ny < c.height) {
+                if (alpha[ny * c.width + nx] < 0.5) nearEdge = true;
+              }
+            }
+          }
+          if (nearEdge) data[i * 4 + 3] = Math.round(blurred[i] * 255);
+        }
+      }
+
+      ctx.putImageData(imageData, 0, 0);
+      c.toBlob(b => resolve(b), 'image/png');
+    };
+    img.src = URL.createObjectURL(blob);
+  });
+}
+
+function boxBlurAlpha(alpha, w, h, r) {
+  const out = new Float32Array(alpha.length);
+  const tmp = new Float32Array(alpha.length);
+  // Horizontal pass
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      let sum = 0, count = 0;
+      for (let dx = -r; dx <= r; dx++) {
+        const nx = x + dx;
+        if (nx >= 0 && nx < w) { sum += alpha[y * w + nx]; count++; }
+      }
+      tmp[y * w + x] = sum / count;
+    }
+  }
+  // Vertical pass
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      let sum = 0, count = 0;
+      for (let dy = -r; dy <= r; dy++) {
+        const ny = y + dy;
+        if (ny >= 0 && ny < h) { sum += tmp[ny * w + x]; count++; }
+      }
+      out[y * w + x] = sum / count;
+    }
+  }
+  return out;
+}
+
+// ── Format conversion ──
+function convertBlob(blob, mime, quality) {
+  return new Promise(resolve => {
+    const img = new Image();
+    img.onload = () => {
+      const c = document.createElement('canvas');
+      c.width = img.width; c.height = img.height;
+      c.getContext('2d').drawImage(img, 0, 0);
+      c.toBlob(b => resolve(b), mime, quality);
+    };
+    img.src = URL.createObjectURL(blob);
+  });
+}
+
+// ── Download ──
+downloadBtn.addEventListener('click', () => {
+  if (!currentResultBlob) return;
+  const ext = $('#outputFormat').value === 'image/webp' ? '.webp' : '.png';
+  downloadBlob(currentResultBlob, selectedFiles[0].name.replace(/\.[^.]+$/, '') + '_nobg' + ext);
+});
+
+downloadAllBtn.addEventListener('click', () => {
+  resultBlobs.forEach(r => {
+    const ext = $('#outputFormat').value === 'image/webp' ? '.webp' : '.png';
+    downloadBlob(r.blob, r.name.replace(/\.[^.]+$/, '') + '_nobg' + ext);
+  });
+});
+
+function downloadBlob(blob, name) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  a.click();
+}
+
+// ── Reset ──
+resetBtn.addEventListener('click', () => {
+  selectedFiles = [];
+  resultBlobs = [];
+  currentResultBlob = null;
+  fileInput.value = '';
+  fileInfo.style.display = 'none';
+  processBtn.disabled = true;
+  hideResults();
+  progressArea.style.display = 'none';
+  batchList.style.display = 'none';
+  batchList.innerHTML = '';
+});
+
+function hideResults() {
+  previewGrid.style.display = 'none';
+  stats.style.display = 'none';
+  colorOptions.style.display = 'none';
+  downloadBtn.classList.add('hidden');
+  downloadAllBtn.classList.add('hidden');
+  resetBtn.classList.add('hidden');
+}
+
+// ── Background color swatches ──
+$$('.color-swatch').forEach(swatch => {
+  swatch.addEventListener('click', () => {
+    $$('.color-swatch').forEach(s => s.classList.remove('active'));
+    swatch.classList.add('active');
+    const color = swatch.dataset.color;
+    if (color === 'transparent') {
+      resultWrap.classList.add('checkerboard');
+      resultWrap.style.backgroundColor = '';
+    } else {
+      resultWrap.classList.remove('checkerboard');
+      resultWrap.style.backgroundColor = color;
+    }
+  });
+});
+
+// ── Feather slider ──
+$('#featherSlider').addEventListener('input', e => {
+  $('#featherVal').textContent = e.target.value + 'px';
+});
+
+// ── Utilities ──
+function formatBytes(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / 1048576).toFixed(1) + ' MB';
+}
+</script>
+</body>
+</html>
