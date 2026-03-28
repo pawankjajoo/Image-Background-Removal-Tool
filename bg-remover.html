@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Developed by Pawan K Jajoo -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -505,6 +506,7 @@ processBtn.addEventListener('click', async () => {
   const feather = parseInt($('#featherSlider').value);
 
   const config = {
+    publicPath: 'https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.5.5/dist/',
     model: quality,
     output: { format: 'image/png', quality: 0.9 },
     progress: (key, current, total) => {
@@ -523,7 +525,7 @@ processBtn.addEventListener('click', async () => {
       const file = selectedFiles[i];
 
       // Update batch status
-      const statusEl = batchList.querySelector(`[data-fname="${CSS.escape(file.name)}"]`);
+      const statusEl = batchList.querySelector('[data-fname="' + file.name.replace(/["\\]/g, '\\$&') + '"]');
       if (statusEl) { statusEl.textContent = 'Processing…'; statusEl.className = 'fstatus processing'; }
 
       // Optionally resize
